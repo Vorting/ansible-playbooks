@@ -1,0 +1,62 @@
+---
+# Install Ansible to Controller Machine. Please be careful about the user names. You have to enter ‘ubuntu’ for Ubuntu machines
+# and ‘ec2-user’ for amazon-linux machines. And finally, you have to enter your key-pem file name into the last line.  
+##
+# Create Users & Groups with a loop
+# CREATE USER. In user-task in loop-argument add usernames.
+# CREATE GROUP. In group-task in section loop-argument enter groupname you want to create.
+# REMOVE USER. You should change state from "present" to "absent" in user-task and run the playbook again.
+# REMOVE GROUP.To remove a group you need to change state from "present" to "absent" in group-task.
+# SSH-KEY.If you don't have ssh-keys. First, you need to create ssh-keygen for remote user. You can get it by using the  "ssh-keygen" command. Now, you need to go to the “.ssh” directory
+# Now, you need to copy your public key, which is “id_rsa.pub” to the controller machine. You have do it manually.
+# Type that path to the “key” line in the playbook as below. Thanks to the “authorized_key” module in Ansible, you can easily send the public key to the nodes
+#
+- name: Creating users, groups & adding ssh-key
+  hosts: webservers
+  become: yes
+  tasks:
+   - name: 1.Creating users
+     user: 
+      name: "{{ item }}"
+      state: present
+      remove: yes
+     loop:
+      - user1 # enter username you want to create
+      - user2
+   - name: 1.2 Creating groups 
+     group:
+      name: "{{ item }}"
+      state: present
+     loop:
+      - group1 # enter groupname you want to create
+# Add users with set paramter 'append' to "yes" and set the specific groups such as: root, sudo or other one.
+# Also we set the shell for user
+   - name: 2 Adding users to the groups & setting shell
+     ansible.builtin.user:
+      name: user1
+      shell: /bin/bash
+      groups: group1
+      append: yes # switch to "no" to delete groups
+
+   - ansible.builtin.user:
+      name: user2
+      shell: /bin/bash
+      groups: group1
+      append: yes # switch to "no" to delete group
+# Place ssh-key to default ~/.ssh location. Example your_local_machine/home/vorting/.ssh/key_name.pub
+# This stage puts contant of your ssh-key.pub to ~/.ssh/authorized_keys on remote machine
+# !!!ATTENTION!!! SSH keys generated via putty will cause some errors. 
+   - name: 3.1 Setting up a single key to authorized key from file
+     authorized_key: # copy local pubkey to remote host
+       user: user2
+       state: present
+       key: "{{ lookup('file', '.ssh/id_rsa.pub') }}"
+
+   - name: 3.2 Set up multiple authorized keys
+     ansible.posix.authorized_key:
+       user: user1
+       state: present
+       key: '{{ item }}'
+     with_file:
+       - .ssh/id_rsa.pub
+       - .ssh/app_id.pub
